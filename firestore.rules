@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerId) {
+      return isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    // User profile documents - each authenticated user can read/write their own
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false; // User accounts cannot be deleted directly from client
+    }
+
+    // Username lookup collection - internal mapping for username-based login
+    // Protected from public enumeration; allows get and authenticated owner claim
+    match /usernames/{username} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Owner root document
+    match /owners/{ownerId} {
+      allow read, write: if isOwner(ownerId);
+
+      // Properties subcollection
+      match /properties/{propertyId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Rooms subcollection
+      match /rooms/{roomId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Beds subcollection
+      match /beds/{bedId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Tenants subcollection
+      match /tenants/{tenantId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Rent Invoices subcollection
+      match /rentInvoices/{invoiceId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Payments subcollection
+      match /payments/{paymentId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Expenses subcollection
+      match /expenses/{expenseId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Maintenance requests subcollection
+      match /maintenance/{requestId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Staff subcollection
+      match /staff/{staffId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Staff Attendance subcollection
+      match /attendance/{attendanceId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Salary Records subcollection
+      match /salaryRecords/{recordId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Documents metadata subcollection
+      match /documents/{documentId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read, write: if isOwner(ownerId);
+      }
+
+      // Settings subcollection
+      match /settings/{settingsId} {
+        allow read, write: if isOwner(ownerId);
+      }
+    }
+
+    // Fallback rule: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
