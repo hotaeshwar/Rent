@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }) {
         {/* Main Content Area */}
         <div
           className={`flex min-h-screen flex-col transition-all duration-300 ${
-            collapsed ? "md:pl-20" : "md:pl-64"
+            collapsed ? "lg:pl-20" : "lg:pl-64"
           }`}
         >
           {/* Top Navbar */}

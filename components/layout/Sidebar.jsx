@@ -46,7 +46,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
     <aside
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`fixed left-0 top-0 hidden h-screen border-r border-slate-200/80 bg-white transition-all duration-300 ease-in-out md:flex md:flex-col ${
+      className={`fixed left-0 top-0 hidden h-screen border-r border-slate-200/80 bg-white transition-all duration-300 ease-in-out lg:flex lg:flex-col ${
         isVisuallyExpanded
           ? "w-64 shadow-2xl z-40"
           : "w-20 shadow-xs z-30"

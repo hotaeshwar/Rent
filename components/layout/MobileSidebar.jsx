@@ -67,7 +67,7 @@ export default function MobileSidebar({ isOpen, onClose }) {
     .toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-50 md:hidden">
+    <div className="fixed inset-0 z-50 lg:hidden">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"

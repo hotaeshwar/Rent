@@ -84,12 +84,12 @@ export default function Navbar({ onOpenMobileMenu, collapsed }) {
   return (
     <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur-md sm:px-6">
       <div className="flex items-center gap-3">
-        {/* Mobile Hamburger Button */}
+        {/* Mobile / Tablet Hamburger Button */}
         <button
           type="button"
           onClick={onOpenMobileMenu}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 md:hidden"
-          aria-label="Open mobile navigation"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 lg:hidden"
+          aria-label="Open navigation menu"
         >
           <Menu size={18} />
         </button>
