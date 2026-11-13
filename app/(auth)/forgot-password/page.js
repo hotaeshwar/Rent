@@ -3,101 +3,69 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useAuth } from "@/contexts/AuthContext";
 import Button from "@/components/ui/Button";
 import {
-  Phone,
-  Mail,
+  User,
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
   Copy,
-  Send,
-  ExternalLink,
   KeyRound,
   ShieldCheck,
 } from "lucide-react";
 
 export default function ForgotPasswordPage() {
-  const [whatsappPhone, setWhatsappPhone] = useState("");
-  const [identifier, setIdentifier] = useState("");
+  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [resetData, setResetData] = useState(null); // { resetUrl, cleanPhone, formattedMessage }
+  const [resetData, setResetData] = useState(null); // { resetUrl, username }
 
-  const { resetPassword } = useAuth();
-
-  const handleGenerateResetLink = async (e) => {
+  const handleGenerateResetLink = (e) => {
     e.preventDefault();
     setError("");
     setCopied(false);
 
-    // Validate phone number
-    const digitsOnly = whatsappPhone.replace(/\D/g, "");
-    if (!digitsOnly || digitsOnly.length < 10) {
-      setError("Please enter a valid 10-digit WhatsApp mobile number");
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername) {
+      setError("Please enter your username");
       return;
     }
 
-    if (!identifier.trim()) {
-      setError("Please enter your registered email address or username");
+    const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+    if (!usernameRegex.test(cleanUsername)) {
+      setError("Username must contain only letters, numbers, and underscores");
       return;
     }
 
     try {
       setLoading(true);
 
-      const phoneWithCountry = digitsOnly.length === 10 ? `91${digitsOnly}` : digitsOnly;
-      const cleanIdent = identifier.trim().toLowerCase();
-
-      // If identifier contains @, trigger Firebase background password reset as backup
-      if (cleanIdent.includes("@")) {
-        try {
-          await resetPassword(cleanIdent);
-        } catch (fbErr) {
-          console.warn("Background email reset notice:", fbErr.message);
-        }
-      }
-
-      // Generate unique secure reset session token
-      const sessionToken = `rst_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-
-      // Construct live reset URL (using current host or Rent.buildingindiadigital.com)
       const baseUrl =
         typeof window !== "undefined"
           ? window.location.origin
           : "https://Rent.buildingindiadigital.com";
 
-      const resetUrl = `${baseUrl}/reset-password?phone=${phoneWithCountry}&user=${encodeURIComponent(
-        cleanIdent
+      const sessionToken = `rst_${Date.now().toString(36)}`;
+      const resetUrl = `${baseUrl}/reset-password?username=${encodeURIComponent(
+        cleanUsername
       )}&token=${sessionToken}`;
 
-      // Store temporary verification token in sessionStorage for reset page validation
+      // Save session for client validation
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
-          "pwd_reset_session",
+          "pwd_reset_user",
           JSON.stringify({
-            phone: phoneWithCountry,
-            user: cleanIdent,
+            username: cleanUsername,
             token: sessionToken,
             createdAt: Date.now(),
           })
         );
       }
 
-      const waMessage = `*BiD Rent Manager - Password Reset*
-
-Hello, here is your secure password reset recovery link:
-${resetUrl}
-
-Click the link above to securely set your new password.`;
-
       setResetData({
         resetUrl,
-        cleanPhone: phoneWithCountry,
-        displayPhone: digitsOnly.slice(-10),
-        message: waMessage,
+        username: cleanUsername,
       });
     } catch (err) {
       console.error("Generate reset link error:", err);
@@ -112,14 +80,6 @@ Click the link above to securely set your new password.`;
     navigator.clipboard.writeText(resetData.resetUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleOpenWhatsApp = () => {
-    if (!resetData) return;
-    const url = `https://wa.me/${resetData.cleanPhone}?text=${encodeURIComponent(
-      resetData.message
-    )}`;
-    window.open(url, "_blank");
   };
 
   return (
@@ -145,7 +105,7 @@ Click the link above to securely set your new password.`;
             Reset Password
           </h2>
           <p className="mt-1 text-xs text-slate-500 max-w-xs">
-            Enter your WhatsApp mobile number to generate and receive your instant reset link
+            Enter your registered username to generate your instant password reset link
           </p>
         </div>
 
@@ -157,24 +117,24 @@ Click the link above to securely set your new password.`;
         )}
 
         {resetData ? (
-          /* Reset Link Appears Here Instantly */
+          /* Reset Link Appears Directly on Screen */
           <div className="mt-6 space-y-4 animate-in fade-in-50 zoom-in-95 duration-200">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-center">
               <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                 <CheckCircle2 size={22} />
               </div>
               <h3 className="mt-2.5 text-sm font-bold text-emerald-950">
-                Reset Link Generated Successfully
+                Reset Link Ready
               </h3>
               <p className="mt-1 text-xs text-emerald-800 leading-normal">
-                Ready for WhatsApp Number: <strong className="font-mono text-emerald-950">+91 {resetData.displayPhone}</strong>
+                Account: <strong className="font-mono text-emerald-950">@{resetData.username}</strong>
               </p>
             </div>
 
             {/* Link Preview Card */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                Your Direct Password Reset Link:
+                Your Password Reset Link:
               </span>
               <div className="p-2.5 rounded-lg bg-white border border-slate-200 font-mono text-[11px] text-slate-800 break-all select-all shadow-2xs">
                 {resetData.resetUrl}
@@ -204,20 +164,10 @@ Click the link above to securely set your new password.`;
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 text-xs font-semibold shadow-xs transition-colors"
                 >
                   <KeyRound size={13} />
-                  <span>Reset Now</span>
+                  <span>Reset Password Now</span>
                 </Link>
               </div>
             </div>
-
-            {/* Direct WhatsApp Share Action */}
-            <button
-              type="button"
-              onClick={handleOpenWhatsApp}
-              className="w-full inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white px-4 py-2.5 text-xs sm:text-sm font-semibold shadow-sm transition-all duration-150 active:scale-98"
-            >
-              <Send size={15} />
-              <span>Send Link to WhatsApp (+91 {resetData.displayPhone})</span>
-            </button>
 
             <div className="pt-2 text-center flex flex-col gap-2">
               <button
@@ -225,7 +175,7 @@ Click the link above to securely set your new password.`;
                 onClick={() => setResetData(null)}
                 className="text-xs text-slate-500 hover:text-emerald-700 transition-colors"
               >
-                Enter a different WhatsApp number
+                Reset for a different username
               </button>
 
               <Link
@@ -238,57 +188,33 @@ Click the link above to securely set your new password.`;
             </div>
           </div>
         ) : (
-          /* Phone & User Prompt Form */
+          /* Username Prompt Form */
           <form onSubmit={handleGenerateResetLink} className="mt-6 space-y-4">
             <div>
               <label
-                htmlFor="whatsappPhone"
+                htmlFor="username"
                 className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-700"
               >
-                WhatsApp Mobile Number <span className="text-red-500">*</span>
+                Username <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
-                  id="whatsappPhone"
-                  type="tel"
+                  id="username"
+                  type="text"
                   required
-                  placeholder="e.g. 9876543210"
-                  value={whatsappPhone}
-                  onChange={(e) => setWhatsappPhone(e.target.value)}
+                  placeholder="e.g. john_pg"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 pl-10 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all duration-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                 />
-                <Phone
+                <User
                   size={16}
                   className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                 />
               </div>
               <p className="mt-1 text-[11px] text-slate-400">
-                Your instant reset recovery link will be generated for this WhatsApp number
+                Your instant reset recovery link will be generated for this username
               </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="identifier"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-700"
-              >
-                Registered Email or Username <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  id="identifier"
-                  type="text"
-                  required
-                  placeholder="e.g. owner@example.com or username"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 pl-10 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all duration-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                />
-                <Mail
-                  size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-              </div>
             </div>
 
             <div className="pt-2">
@@ -298,7 +224,7 @@ Click the link above to securely set your new password.`;
                 icon={KeyRound}
                 className="w-full min-h-11 text-xs sm:text-sm font-semibold"
               >
-                Generate WhatsApp Reset Link
+                Generate Reset Link
               </Button>
             </div>
 

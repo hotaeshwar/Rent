@@ -10,7 +10,7 @@ import Button from "@/components/ui/Button";
 import { LogIn, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
-  const [identifier, setIdentifier] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -22,8 +22,8 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    if (!identifier.trim()) {
-      setError("Please enter your username or registered email");
+    if (!username.trim()) {
+      setError("Please enter your username");
       return;
     }
     if (!password) {
@@ -33,11 +33,11 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      await login(identifier, password);
+      await login(username.trim(), password);
       router.replace("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
-      let msg = "Invalid username/email or password";
+      let msg = "Invalid username or password";
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         msg = "Invalid username or password. Please verify and try again.";
       } else if (err.code === "auth/operation-not-allowed") {
@@ -101,19 +101,19 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
             <label
-              htmlFor="identifier"
+              htmlFor="username"
               className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-700"
             >
-              Username or Email <span className="text-red-500">*</span>
+              Username <span className="text-red-500">*</span>
             </label>
             <input
-              id="identifier"
+              id="username"
               type="text"
               required
               autoComplete="username"
-              placeholder="e.g. john_doe or john@example.com"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="e.g. john_pg"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all duration-200 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
             />
           </div>

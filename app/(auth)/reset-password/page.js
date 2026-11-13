@@ -7,14 +7,12 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Button from "@/components/ui/Button";
-import { KeyRound, CheckCircle2, AlertCircle, ArrowLeft, Phone, ShieldCheck } from "lucide-react";
+import { KeyRound, CheckCircle2, AlertCircle, ArrowLeft, User } from "lucide-react";
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
+  const username = searchParams.get("username");
   const oobCode = searchParams.get("oobCode");
-  const phone = searchParams.get("phone");
-  const userParam = searchParams.get("user");
-  const token = searchParams.get("token");
   const router = useRouter();
 
   const [password, setPassword] = useState("");
@@ -25,8 +23,7 @@ function ResetPasswordContent() {
 
   const { confirmReset } = useAuth();
 
-  const isWhatsAppReset = Boolean(phone || token);
-  const isValidLink = Boolean(oobCode || isWhatsAppReset);
+  const isValidLink = Boolean(username || oobCode);
 
   useEffect(() => {
     if (!isValidLink) {
@@ -59,13 +56,12 @@ function ResetPasswordContent() {
       setLoading(true);
 
       if (oobCode) {
-        // Standard Firebase Email reset handler
+        // Standard action code if present
         await confirmReset(oobCode, password);
-      } else if (isWhatsAppReset) {
-        // WhatsApp reset session handler
+      } else if (username) {
+        // Username reset session
         if (typeof window !== "undefined") {
-          // Clear temporary recovery session
-          sessionStorage.removeItem("pwd_reset_session");
+          sessionStorage.removeItem("pwd_reset_user");
         }
       }
 
@@ -109,11 +105,10 @@ function ResetPasswordContent() {
         </p>
       </div>
 
-      {phone && (
+      {username && (
         <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 py-1.5 px-3 text-xs text-emerald-800 font-medium">
-          <Phone size={13} className="text-emerald-600" />
-          <span>WhatsApp Recovery: +91 {phone.replace(/\D/g, "").slice(-10)}</span>
-          {userParam && <span className="text-emerald-600">({userParam})</span>}
+          <User size={13} className="text-emerald-600" />
+          <span>Resetting Password for: <strong>@{username}</strong></span>
         </div>
       )}
 
@@ -126,7 +121,7 @@ function ResetPasswordContent() {
             Password Updated Successfully
           </h3>
           <p className="mt-1.5 text-xs text-emerald-700">
-            Your new secure password has been set. You can now log in to your account with your new credentials.
+            Your new password has been set. You can now log in using your username <strong>@{username || "account"}</strong>.
           </p>
           <div className="mt-5">
             <Link
@@ -196,7 +191,7 @@ export default function ResetPasswordPage() {
       <Suspense
         fallback={
           <div className="flex items-center justify-center p-8 text-xs text-slate-500">
-            Loading security verification...
+            Loading reset form...
           </div>
         }
       >
