@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { isUsernameRegistered } from "@/lib/usernameClient";
 import Button from "@/components/ui/Button";
 import {
   User,
@@ -12,6 +14,7 @@ import {
   Copy,
   KeyRound,
   ShieldCheck,
+  UserCheck,
 } from "lucide-react";
 
 export default function ForgotPasswordPage() {
@@ -21,7 +24,9 @@ export default function ForgotPasswordPage() {
   const [copied, setCopied] = useState(false);
   const [resetData, setResetData] = useState(null); // { resetUrl, username }
 
-  const handleGenerateResetLink = (e) => {
+  const { resetPassword } = useAuth();
+
+  const handleGenerateResetLink = async (e) => {
     e.preventDefault();
     setError("");
     setCopied(false);
@@ -41,6 +46,27 @@ export default function ForgotPasswordPage() {
     try {
       setLoading(true);
 
+      // Verify that this username is actually registered in the database
+      const check = await isUsernameRegistered(cleanUsername);
+
+      if (!check.registered) {
+        setError(
+          `Username "@${cleanUsername}" is not registered. Please check the spelling or create a new account.`
+        );
+        setResetData(null);
+        setLoading(false);
+        return;
+      }
+
+      // If registered email exists, trigger Firebase reset email as backup
+      if (check.email) {
+        try {
+          await resetPassword(check.email);
+        } catch (fbErr) {
+          console.warn("Background password reset notice:", fbErr.message);
+        }
+      }
+
       const baseUrl =
         typeof window !== "undefined"
           ? window.location.origin
@@ -51,7 +77,7 @@ export default function ForgotPasswordPage() {
         cleanUsername
       )}&token=${sessionToken}`;
 
-      // Save session for client validation
+      // Save session for client verification
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
           "pwd_reset_user",
@@ -69,7 +95,7 @@ export default function ForgotPasswordPage() {
       });
     } catch (err) {
       console.error("Generate reset link error:", err);
-      setError("Failed to generate password reset link. Please try again.");
+      setError("Failed to verify username. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -105,7 +131,7 @@ export default function ForgotPasswordPage() {
             Reset Password
           </h2>
           <p className="mt-1 text-xs text-slate-500 max-w-xs">
-            Enter your registered username to generate your instant password reset link
+            Enter your registered username to verify your account and generate your reset link
           </p>
         </div>
 
@@ -124,10 +150,10 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2 size={22} />
               </div>
               <h3 className="mt-2.5 text-sm font-bold text-emerald-950">
-                Reset Link Ready
+                Verified Account Found
               </h3>
               <p className="mt-1 text-xs text-emerald-800 leading-normal">
-                Account: <strong className="font-mono text-emerald-950">@{resetData.username}</strong>
+                Username verified: <strong className="font-mono text-emerald-950">@{resetData.username}</strong>
               </p>
             </div>
 
@@ -195,7 +221,7 @@ export default function ForgotPasswordPage() {
                 htmlFor="username"
                 className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-700"
               >
-                Username <span className="text-red-500">*</span>
+                Registered Username <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -213,7 +239,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               <p className="mt-1 text-[11px] text-slate-400">
-                Your instant reset recovery link will be generated for this username
+                Only registered usernames will be accepted to generate a password reset link
               </p>
             </div>
 
@@ -224,7 +250,7 @@ export default function ForgotPasswordPage() {
                 icon={KeyRound}
                 className="w-full min-h-11 text-xs sm:text-sm font-semibold"
               >
-                Generate Reset Link
+                Verify Username & Generate Link
               </Button>
             </div>
 

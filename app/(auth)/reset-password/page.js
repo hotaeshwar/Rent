@@ -5,9 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { isUsernameRegistered } from "@/lib/usernameClient";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Button from "@/components/ui/Button";
-import { KeyRound, CheckCircle2, AlertCircle, ArrowLeft, User } from "lucide-react";
+import { KeyRound, CheckCircle2, AlertCircle, ArrowLeft, User, Loader2 } from "lucide-react";
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
@@ -18,6 +19,8 @@ function ResetPasswordContent() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingUsername, setCheckingUsername] = useState(Boolean(username && !oobCode));
+  const [isRegistered, setIsRegistered] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,8 +33,36 @@ function ResetPasswordContent() {
       setError(
         "Invalid or expired password reset link. Please request a new link from the reset password page."
       );
+      return;
     }
-  }, [isValidLink]);
+
+    if (username && !oobCode) {
+      let active = true;
+      setCheckingUsername(true);
+      isUsernameRegistered(username)
+        .then((res) => {
+          if (!active) return;
+          if (!res.registered) {
+            setIsRegistered(false);
+            setError(
+              `Username "@${username}" is not registered. Password reset is only available for registered accounts.`
+            );
+          } else {
+            setIsRegistered(true);
+          }
+        })
+        .catch((err) => {
+          console.warn("Username verification warning:", err);
+        })
+        .finally(() => {
+          if (active) setCheckingUsername(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }
+  }, [isValidLink, username, oobCode]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,6 +70,11 @@ function ResetPasswordContent() {
 
     if (!isValidLink) {
       setError("Missing reset verification credentials. Please request a new link.");
+      return;
+    }
+
+    if (!isRegistered) {
+      setError(`Username "@${username}" is not registered. Cannot reset password.`);
       return;
     }
 
@@ -112,7 +148,38 @@ function ResetPasswordContent() {
         </div>
       )}
 
-      {success ? (
+      {checkingUsername ? (
+        <div className="mt-8 flex flex-col items-center justify-center p-6 text-center">
+          <Loader2 className="h-7 w-7 animate-spin text-emerald-600 mb-2" />
+          <p className="text-xs text-slate-500">Verifying username registration...</p>
+        </div>
+      ) : !isRegistered ? (
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-5 text-center animate-in fade-in-50">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-700">
+            <AlertCircle size={24} />
+          </div>
+          <h3 className="mt-3 text-sm font-semibold text-red-900">
+            Username Not Registered
+          </h3>
+          <p className="mt-1.5 text-xs text-red-700">
+            The username <strong>@{username}</strong> was not found in our records. Only registered accounts can reset their password.
+          </p>
+          <div className="mt-5 space-y-2">
+            <Link
+              href="/forgot-password"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors w-full"
+            >
+              Try Another Username
+            </Link>
+            <Link
+              href="/register"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors w-full"
+            >
+              Register New Account
+            </Link>
+          </div>
+        </div>
+      ) : success ? (
         <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center animate-in fade-in-50 zoom-in-95">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
             <CheckCircle2 size={24} />

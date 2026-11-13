@@ -136,6 +136,18 @@ export const AuthProvider = ({ children }) => {
     };
     try {
       await setDoc(userRef, profile, { merge: true });
+      // Also register username index in Firestore for client-side lookups
+      await setDoc(
+        doc(db, "usernames", normalizedUsername),
+        {
+          uid: firebaseUser.uid,
+          email: email.trim(),
+          username: normalizedUsername,
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      ).catch((e) => console.warn("Firestore username index note:", e.message));
+
       setUserProfile(profile);
     } catch (fsErr) {
       console.warn("Firestore profile save warning:", fsErr);
