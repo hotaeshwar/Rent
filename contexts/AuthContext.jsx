@@ -72,17 +72,42 @@ export const AuthProvider = ({ children }) => {
     // If identifier doesn't contain '@', resolve username
     if (!identifier.includes("@")) {
       const normalized = identifier.trim().toLowerCase();
-      const res = await fetch("/api/auth/resolve-username", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalized }),
-      });
+      let resolvedEmail = null;
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Invalid username or password");
+      // 1. Direct Firestore check (works on static hosting like GitHub Pages)
+      try {
+        const usernameDoc = await getDoc(doc(db, "usernames", normalized));
+        if (usernameDoc.exists() && usernameDoc.data()?.email) {
+          resolvedEmail = usernameDoc.data().email;
+        }
+      } catch (fsErr) {
+        console.warn("Direct Firestore username lookup note:", fsErr);
       }
-      email = data.email;
+
+      // 2. Fallback to API route if running in a Node.js server environment
+      if (!resolvedEmail) {
+        try {
+          const res = await fetch("/api/auth/resolve-username", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: normalized }),
+          });
+          const ct = res.headers.get("content-type") || "";
+          if (ct.includes("application/json")) {
+            const data = await res.json();
+            if (res.ok && data?.email) {
+              resolvedEmail = data.email;
+            }
+          }
+        } catch (apiErr) {
+          console.warn("API username lookup note:", apiErr);
+        }
+      }
+
+      if (!resolvedEmail) {
+        throw new Error("Invalid username or password");
+      }
+      email = resolvedEmail;
     }
 
     const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -93,37 +118,64 @@ export const AuthProvider = ({ children }) => {
   const register = async ({ fullName, username, email, password }) => {
     const normalizedUsername = username.trim().toLowerCase();
 
-    // Check username availability via API first
-    const checkRes = await fetch("/api/auth/check-username", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: normalizedUsername }),
-    });
-    const checkData = await checkRes.json();
-    if (!checkRes.ok || !checkData.available) {
-      throw new Error(checkData.error || "This username is already taken");
+    // 1. Check username availability in Firestore directly (works on GitHub Pages)
+    try {
+      const existingUserSnap = await getDoc(doc(db, "usernames", normalizedUsername));
+      if (existingUserSnap.exists()) {
+        throw new Error("This username is already taken. Please choose another username.");
+      }
+    } catch (checkErr) {
+      if (checkErr.message?.includes("already taken")) {
+        throw checkErr;
+      }
+      console.warn("Firestore username pre-check note:", checkErr);
     }
 
-    // 1. Create in Firebase Auth
+    // Optional API check if running in server runtime
+    try {
+      const checkRes = await fetch("/api/auth/check-username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: normalizedUsername }),
+      });
+      const ct = checkRes.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        const checkData = await checkRes.json();
+        if (checkRes.ok && checkData.available === false) {
+          throw new Error(checkData.error || "This username is already taken");
+        }
+      }
+    } catch (apiCheckErr) {
+      if (apiCheckErr.message?.includes("already taken")) {
+        throw apiCheckErr;
+      }
+      // Non-blocking on static hosting
+    }
+
+    // 2. Create in Firebase Auth
     const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const firebaseUser = userCredential.user;
 
-    // 2. Update display name
+    // 3. Update display name
     await updateProfile(firebaseUser, { displayName: fullName.trim() });
 
-    // 3. Register username in backend and create user profile in Firestore
-    await fetch("/api/auth/register-username", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        uid: firebaseUser.uid,
-        email: email.trim(),
-        username: normalizedUsername,
-        fullName: fullName.trim(),
-      }),
-    });
+    // 4. Register username in backend if available (safely without crashing on static HTML 404)
+    try {
+      await fetch("/api/auth/register-username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: firebaseUser.uid,
+          email: email.trim(),
+          username: normalizedUsername,
+          fullName: fullName.trim(),
+        }),
+      });
+    } catch (apiRegErr) {
+      // Expected on static hosting where API routes are not active
+    }
 
-    // Also write to user's profile document directly from client
+    // 5. Also write to user's profile document directly from client
     const userRef = doc(db, "users", firebaseUser.uid);
     const profile = {
       uid: firebaseUser.uid,
@@ -136,7 +188,7 @@ export const AuthProvider = ({ children }) => {
     };
     try {
       await setDoc(userRef, profile, { merge: true });
-      // Also register username index in Firestore for client-side lookups
+      // 6. Also register username index in Firestore for client-side lookups
       await setDoc(
         doc(db, "usernames", normalizedUsername),
         {

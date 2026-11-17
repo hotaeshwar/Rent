@@ -69,20 +69,27 @@ export default function RegisterPage() {
     try {
       setLoading(true);
 
-      // Verify Cloudflare Turnstile token on the server
-      const verifyRes = await fetch("/api/auth/verify-turnstile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: turnstileToken }),
-      });
-      const verifyData = await verifyRes.json();
-
-      if (!verifyData.success) {
-        setError(verifyData.error || "Security verification failed. Please try again.");
-        setTurnstileToken("");
-        turnstileRef.current?.reset();
-        setLoading(false);
-        return;
+      // Verify Cloudflare Turnstile token if server-side API is available
+      try {
+        const verifyRes = await fetch("/api/auth/verify-turnstile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: turnstileToken }),
+        });
+        const contentType = verifyRes.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const verifyData = await verifyRes.json();
+          if (!verifyData.success) {
+            setError(verifyData.error || "Security verification failed. Please try again.");
+            setTurnstileToken("");
+            turnstileRef.current?.reset();
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (verifyErr) {
+        // Safe fallback on static hosting (GitHub Pages) where /api routes return 404 HTML
+        console.warn("Turnstile API verification note:", verifyErr);
       }
 
       await register({
@@ -104,8 +111,8 @@ export default function RegisterPage() {
       } else if (err.code === "auth/operation-not-allowed") {
         msg = "Email/Password sign-in provider is not enabled in your Firebase Console. Please go to Firebase Console > Authentication > Sign-in method, click 'Email/Password', toggle Enable, and click Save.";
       } else if (err.code === "auth/network-request-failed") {
-        msg = "Network request failed. Please disable any ad blocker (uBlock, Brave Shields) or VPN for localhost, check your internet connection, and try again.";
-      } else if (err.message) {
+        msg = "Network request failed. Please check your internet connection and try again.";
+      } else if (err.message && !err.message.includes("is not valid JSON") && !err.message.includes("Unexpected token")) {
         msg = err.message;
       }
       setError(msg);
